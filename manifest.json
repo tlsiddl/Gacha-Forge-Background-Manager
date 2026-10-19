@@ -3,7 +3,7 @@
   "version": 1,
   "config": {
     "name": "Gacha Forge · 배경 관리자",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "description": "전체화면 팝업 지원 · 컴팩트 티켓 UI · 저장 배경 자동 확인 · 수동 생성 승인",
     "runtime": "client",
     "capabilities": [

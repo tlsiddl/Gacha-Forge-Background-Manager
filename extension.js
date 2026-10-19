@@ -115,12 +115,14 @@
     }
     return roots;
   }
+  // v0.3.5: never treat other extensions' panels (e.g. the Gacha Forge quest extension) as the story header.
+  const GFMB_FOREIGN='#gfmb-details,#gfmb-inline,#gfq-01-panel,#gfq-01-toasts,dialog[open]';
   function headerTarget(){
     const roots=readerRoots();
     // Directly match verified markup. Exclude headings hidden in menus or other panels.
     for(const root of roots){
       for(const n of root.querySelectorAll('span.mood')){
-        if(n.closest('#gfmb-details,#gfmb-inline'))continue;
+        if(n.closest(GFMB_FOREIGN))continue;
         const t=(n.textContent||'').trim();
         if(!CHAPTER_RE.test(t))continue;
         const r=n.getBoundingClientRect();
@@ -130,7 +132,7 @@
     // Fallback for other Gacha Forge releases.
     const nodes=roots.flatMap(root=>[...root.querySelectorAll('span,header,h1,h2,h3')]);
     return nodes.find(n=>{
-      if(n.closest('#gfmb-details,#gfmb-inline'))return false;
+      if(n.closest(GFMB_FOREIGN))return false;
       const t=(n.textContent||'').trim(),r=n.getBoundingClientRect();
       return t.length>=4&&t.length<140&&CHAPTER_RE.test(t)&&r.width>0&&r.height>0&&r.top>=0&&r.top<innerHeight*.5;
     })||null;
@@ -188,7 +190,7 @@
     #gfmb-details button.gfmb-create{background:#262626;color:#fff;border:1px solid #1a1a1a;border-radius:2px;padding:6px 8px;font-size:11px;font-weight:800}
     #gfmb-details .gfmb-warning{font-size:10px;color:#625d56;line-height:1.6;margin:8px 0 0}
     #gfmb-details .gfmb-foot{display:flex;justify-content:space-between;font-size:9px;font-weight:700;letter-spacing:.1em;border-top:2px solid #171717;padding-top:9px;margin-top:4px;color:#615b53}
-    /* v0.3.4 — compact, restrained ticket UI; avoid visually broken cut-outs */
+    /* v0.3.5 — compact, restrained ticket UI; avoid visually broken cut-outs */
     #gfmb-details{width:min(390px,calc(100vw - 20px));max-height:min(87vh,720px);border-radius:12px;overflow:auto;box-shadow:0 20px 55px #0008;background:#f1eee6}
     #gfmb-details .gfmb-ticket{min-height:0;padding:16px 17px 13px;background:linear-gradient(135deg,#f8f5ee,#ece8df)}
     #gfmb-details .gfmb-topline{padding-bottom:7px;font-size:8px;letter-spacing:.13em;gap:8px}
@@ -272,7 +274,7 @@
     }).join(''):'<p class="gfmb-caption">스토리를 열어 장소 정보를 불러와 주세요.</p>';
     box.innerHTML=`<div class="gfmb-ticket">
       <div class="gfmb-topline"><span>✦ GACHA FORGE</span><span>BACKGROUND / MANAGER</span><button class="gfmb-close" data-act="close" aria-label="닫기" title="닫기">✕</button></div>
-      <div class="gfmb-head"><h2>가챠포지 · 배경 관리자 <span class="gfmb-version">v0.3.4</span></h2><span class="gfmb-star" aria-hidden="true">✦</span></div>
+      <div class="gfmb-head"><h2>가챠포지 · 배경 관리자 <span class="gfmb-version">v0.3.5</span></h2><span class="gfmb-star" aria-hidden="true">✦</span></div>
       <div class="gfmb-meta"><span>◉ <b>세계</b> ${run}</span><span>▤ <b>${position}</b></span></div>
       <div class="gfmb-status"><div class="gfmb-eyebrow">◆ 배경 상태 · 자동 확인</div><div class="gfmb-statustext">${status}</div></div>
       <div class="gfmb-section"><div class="gfmb-sectiontitle">✦ 화면 설정</div>
