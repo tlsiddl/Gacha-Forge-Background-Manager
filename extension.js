@@ -104,7 +104,16 @@
   const CHAPTER_RE=/(?:\d+\s*챕터|챕터\s*\d+|chapter\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)|제\s*\d+\s*장)/i;
   // Gacha Forge reader's actual chapter subtitle is <span class="mood">…</span>.
   // Traverse open shadow roots as well as the main document; don't depend on localized title text.
+  // v0.3.6: the full-page shadow-root scan below touches every element on the page,
+  // so reuse its result for 2s (and re-scan early if a found shadow host was removed).
+  let rootsCache=null,rootsAt=0;
   function readerRoots(){
+    const now=performance.now();
+    if(rootsCache&&now-rootsAt<2000&&rootsCache.every(r=>r===document||r.host?.isConnected))return rootsCache;
+    rootsCache=scanReaderRoots();rootsAt=now;
+    return rootsCache;
+  }
+  function scanReaderRoots(){
     const roots=[document],queue=[document],seen=new Set([document]);
     for(let i=0;i<queue.length&&i<120;i++){
       const root=queue[i];
@@ -131,10 +140,14 @@
     }
     // Fallback for other Gacha Forge releases.
     const nodes=roots.flatMap(root=>[...root.querySelectorAll('span,header,h1,h2,h3')]);
+    // v0.3.6: check the (cheap) text first; measure the box only for real chapter titles,
+    // because every measurement forces the browser to recalculate the whole page layout.
     return nodes.find(n=>{
+      const t=(n.textContent||'').trim();
+      if(t.length<4||t.length>=140||!CHAPTER_RE.test(t))return false;
       if(n.closest(GFMB_FOREIGN))return false;
-      const t=(n.textContent||'').trim(),r=n.getBoundingClientRect();
-      return t.length>=4&&t.length<140&&CHAPTER_RE.test(t)&&r.width>0&&r.height>0&&r.top>=0&&r.top<innerHeight*.5;
+      const r=n.getBoundingClientRect();
+      return r.width>0&&r.height>0&&r.top>=0&&r.top<innerHeight*.5;
     })||null;
   }
   function activeStory(){return !!headerTarget();}
@@ -274,7 +287,7 @@
     }).join(''):'<p class="gfmb-caption">스토리를 열어 장소 정보를 불러와 주세요.</p>';
     box.innerHTML=`<div class="gfmb-ticket">
       <div class="gfmb-topline"><span>✦ GACHA FORGE</span><span>BACKGROUND / MANAGER</span><button class="gfmb-close" data-act="close" aria-label="닫기" title="닫기">✕</button></div>
-      <div class="gfmb-head"><h2>가챠포지 · 배경 관리자 <span class="gfmb-version">v0.3.5</span></h2><span class="gfmb-star" aria-hidden="true">✦</span></div>
+      <div class="gfmb-head"><h2>가챠포지 · 배경 관리자 <span class="gfmb-version">v0.3.6</span></h2><span class="gfmb-star" aria-hidden="true">✦</span></div>
       <div class="gfmb-meta"><span>◉ <b>세계</b> ${run}</span><span>▤ <b>${position}</b></span></div>
       <div class="gfmb-status"><div class="gfmb-eyebrow">◆ 배경 상태 · 자동 확인</div><div class="gfmb-statustext">${status}</div></div>
       <div class="gfmb-section"><div class="gfmb-sectiontitle">✦ 화면 설정</div>
@@ -297,6 +310,7 @@
       }
     }
     state.animTouched.clear();
+    spinChecked=new WeakSet();
   }
   function fixOneAnimation(el,animation){
     if(!el?.isConnected)return;
@@ -321,8 +335,9 @@
     animRoot=tgt.getRootNode();
     return animRoot;
   }
+  let spinChecked=new WeakSet();
   function fixAnimations(){
-    if(state.disposed)return;
+    if(state.disposed||document.hidden)return;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     if(!state.animations||!reduced){
       if(state.animTouched.size)resetAnim();
@@ -338,8 +353,11 @@
         : 'vn-bob 1.6s ease-in-out infinite');
     }
     for(const el of root.querySelectorAll('g.spin')){
-      const name=getComputedStyle(el).animationName;
-      if(name==='forge-spin'||state.animTouched.has(el))
+      // v0.3.6: getComputedStyle forces a full style recalculation, so ask only once per element.
+      if(state.animTouched.has(el)){fixOneAnimation(el,'forge-spin 1s linear infinite');continue;}
+      if(spinChecked.has(el))continue;
+      spinChecked.add(el);
+      if(getComputedStyle(el).animationName==='forge-spin')
         fixOneAnimation(el,'forge-spin 1s linear infinite');
     }
     // Avoid holding references to long-deleted loading SVG elements.
@@ -499,7 +517,7 @@
     animTimer=setInterval(fixAnimations,120);
     // For shadow-root UIs the body observer doesn't receive internal mutations.
     // Slow, bounded probe only until the subtitle is mounted.
-    probeTimer=setInterval(()=>{if(!state.disposed){if(!mini||!mini.isConnected)renderInline();if(box&&box.parentNode!==fullscreenDestination())syncFullscreenPanel();}},400);draw();}
+    probeTimer=setInterval(()=>{if(!state.disposed&&!document.hidden){if(!mini||!mini.isConnected)renderInline();if(box&&box.parentNode!==fullscreenDestination())syncFullscreenPanel();}},400);draw();}
   if(document.body)mount();else document.addEventListener('DOMContentLoaded',mount,{once:true});
   window[KEY]=()=>{state.disposed=true;if(window.fetch===wrapper)window.fetch=oldFetch;observer?.disconnect();clearTimeout(autoCheckTimer);autoCheckToken++;clearTimeout(uiTimer);clearInterval(animTimer);clearInterval(probeTimer);resetAnim();document.removeEventListener('fullscreenchange',onFullscreenChanged);document.removeEventListener('webkitfullscreenchange',onFullscreenChanged);fullscreenPanelStyle?.remove();hostStyle?.remove();box?.remove();mini?.remove();document.getElementById('gfmb-v034-style')?.remove();delete window[KEY];};
 })();
